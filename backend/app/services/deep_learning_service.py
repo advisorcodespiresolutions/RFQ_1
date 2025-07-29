@@ -1,5 +1,53 @@
 """
 Deep Learning Service for Advanced Manufacturing Analysis
+
+This service implements sophisticated deep learning models for manufacturing
+intelligence, providing capabilities that go beyond traditional machine learning:
+
+ARCHITECTURE OVERVIEW:
+1. Multi-Modal Learning: Processes both 2D drawings and 3D models
+2. Transfer Learning: Leverages pre-trained models for faster convergence
+3. Ensemble Methods: Combines multiple model outputs for better accuracy
+4. Online Learning: Continuously improves from real-world feedback
+
+KEY COMPONENTS:
+
+1. CADImageDataset - PyTorch Dataset for Loading and Preprocessing:
+   - Handles various image formats (PNG, JPG, PDF conversions)
+   - Applies data augmentation for robust training
+   - Normalizes images using ImageNet statistics
+   - Manages memory efficiently for large datasets
+
+2. DimensionExtractorCNN - Computer Vision Model:
+   - Multi-task architecture: classification + regression
+   - Extracts geometric features from technical drawings
+   - Predicts dimensions, tolerances, and part complexity
+   - Uses attention mechanisms for feature focus
+
+3. CostPredictionTransformer - Advanced Cost Estimation:
+   - Transformer architecture for sequence modeling
+   - Handles variable-length part feature sequences
+   - Learns complex cost relationships across processes
+   - Provides uncertainty quantification
+
+4. DeepLearningService - Main Orchestrator:
+   - Manages model lifecycle and training
+   - Provides unified prediction interface
+   - Handles model versioning and deployment
+   - Implements explainable AI features
+
+DEEP LEARNING ADVANTAGES:
+- Automatic Feature Learning: No manual feature engineering required
+- Non-Linear Relationships: Captures complex manufacturing interactions
+- Scalability: Performance improves with more data
+- Generalization: Works across different part types and materials
+- Uncertainty Estimation: Provides confidence scores with predictions
+
+TRAINING METHODOLOGY:
+- Synthetic Data Generation: Creates realistic training samples
+- Progressive Training: Starts simple, adds complexity gradually
+- Regularization: Prevents overfitting with dropout and batch norm
+- Validation: Continuous monitoring of generalization performance
 """
 
 import torch
