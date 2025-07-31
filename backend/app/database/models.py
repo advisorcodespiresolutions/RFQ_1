@@ -2,258 +2,219 @@
 Database models for the RFQ platform
 """
 
-from sqlalchemy import (
-    Column, Integer, String, Float, DateTime, Boolean, Text, 
-    ForeignKey, JSON, Enum as SQLEnum
-)
+from sqlalchemy import Column, Integer, String, Text, DateTime, Boolean, Float, ForeignKey, Enum, JSON, Table
+from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import relationship
 from sqlalchemy.sql import func
-from datetime import datetime
 import enum
+from datetime import datetime
 
-from app.database.database import Base
+Base = declarative_base()
 
+class UserRole(str, enum.Enum):
+    SUPER_ADMIN = "super_admin"
+    ADMIN = "admin"
+    IT_MANAGER = "it_manager"
+    VENDOR = "vendor"
 
-class QuoteStatus(str, enum.Enum):
-    """Quote status enumeration"""
-    PENDING = "pending"
-    IN_REVIEW = "in_review"
-    APPROVED = "approved"
-    REJECTED = "rejected"
-    SENT = "sent"
-    EXPIRED = "expired"
+class PartnerTier(str, enum.Enum):
+    TIER_1_STRATEGIC = "tier_1_strategic"
+    TIER_2_PREFERRED = "tier_2_preferred"
+    TIER_3_NICHE = "tier_3_niche"
 
+class PartnerType(str, enum.Enum):
+    STAFFING = "staffing"
+    SOW = "sow"
+    NEARSHORE = "nearshore"
+    OFFSHORE = "offshore"
+    NICHE = "niche"
+    SPECIALIZED = "specialized"
 
-class PartComplexity(str, enum.Enum):
-    """Part complexity enumeration"""
-    LOW = "low"
-    MEDIUM = "medium"
-    HIGH = "high"
+class ServiceModel(str, enum.Enum):
+    TIME_AND_MATERIALS = "time_and_materials"
+    FIXED_FEE = "fixed_fee"
+    AGILE_TEAMS = "agile_teams"
+    MANAGED_SERVICES = "managed_services"
 
+# Association tables for many-to-many relationships
+partner_regions = Table(
+    'partner_regions',
+    Base.metadata,
+    Column('partner_id', Integer, ForeignKey('partners.id')),
+    Column('region_id', Integer, ForeignKey('regions.id'))
+)
 
-class MachiningProcess(str, enum.Enum):
-    """Machining process enumeration"""
-    CNC_MILLING = "cnc_milling"
-    CNC_TURNING = "cnc_turning"
-    EDM = "edm"
-    GRINDING = "grinding"
-    DRILLING = "drilling"
-    LASER_CUTTING = "laser_cutting"
-    WATERJET = "waterjet"
-    MANUAL = "manual"
-
+partner_capabilities = Table(
+    'partner_capabilities',
+    Base.metadata,
+    Column('partner_id', Integer, ForeignKey('partners.id')),
+    Column('capability_id', Integer, ForeignKey('capabilities.id'))
+)
 
 class User(Base):
-    """User model"""
     __tablename__ = "users"
     
     id = Column(Integer, primary_key=True, index=True)
-    username = Column(String(50), unique=True, index=True, nullable=False)
-    email = Column(String(100), unique=True, index=True, nullable=False)
-    full_name = Column(String(100), nullable=False)
-    hashed_password = Column(String(255), nullable=False)
-    is_active = Column(Boolean, default=True)
-    is_admin = Column(Boolean, default=False)
-    role = Column(String(50), default="estimator")  # estimator, admin, client_viewer
-    created_at = Column(DateTime(timezone=True), server_default=func.now())
-    updated_at = Column(DateTime(timezone=True), onupdate=func.now())
-    
-    # Relationships
-    quotes = relationship("Quote", back_populates="created_by_user")
-
-
-class Client(Base):
-    """Client/Customer model"""
-    __tablename__ = "clients"
-    
-    id = Column(Integer, primary_key=True, index=True)
-    name = Column(String(200), nullable=False, index=True)
-    company = Column(String(200), nullable=False)
-    email = Column(String(100), nullable=False)
-    phone = Column(String(20))
-    address = Column(Text)
-    country = Column(String(50), default="US")
-    currency = Column(String(3), default="USD")
-    tax_rate = Column(Float, default=0.0)
+    email = Column(String, unique=True, index=True, nullable=False)
+    hashed_password = Column(String, nullable=False)
+    first_name = Column(String, nullable=False)
+    last_name = Column(String, nullable=False)
+    role = Column(Enum(UserRole), nullable=False)
     is_active = Column(Boolean, default=True)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     updated_at = Column(DateTime(timezone=True), onupdate=func.now())
     
     # Relationships
-    quotes = relationship("Quote", back_populates="client")
+    feedback_given = relationship("Feedback", back_populates="reviewer", foreign_keys="Feedback.reviewer_id")
+    partner = relationship("Partner", back_populates="user", uselist=False)
 
-
-class Quote(Base):
-    """Main quote model"""
-    __tablename__ = "quotes"
+class Region(Base):
+    __tablename__ = "regions"
     
     id = Column(Integer, primary_key=True, index=True)
-    quote_number = Column(String(50), unique=True, index=True, nullable=False)
-    title = Column(String(200), nullable=False)
+    name = Column(String, unique=True, nullable=False)
+    code = Column(String, unique=True, nullable=False)
     description = Column(Text)
-    
-    # Status and timing
-    status = Column(SQLEnum(QuoteStatus), default=QuoteStatus.PENDING)
-    created_at = Column(DateTime(timezone=True), server_default=func.now())
-    updated_at = Column(DateTime(timezone=True), onupdate=func.now())
-    expires_at = Column(DateTime(timezone=True))
-    approved_at = Column(DateTime(timezone=True))
-    
-    # Financial
-    total_cost = Column(Float, default=0.0)
-    total_quote_amount = Column(Float, default=0.0)
-    margin_percentage = Column(Float, default=20.0)
-    currency = Column(String(3), default="USD")
-    
-    # Processing
-    estimated_delivery_days = Column(Integer, default=14)
-    actual_delivery_days = Column(Integer)
-    ai_confidence_score = Column(Float, default=0.0)
-    
-    # Relationships
-    client_id = Column(Integer, ForeignKey("clients.id"))
-    created_by = Column(Integer, ForeignKey("users.id"))
-    
-    client = relationship("Client", back_populates="quotes")
-    created_by_user = relationship("User", back_populates="quotes")
-    parts = relationship("Part", back_populates="quote", cascade="all, delete-orphan")
-    files = relationship("QuoteFile", back_populates="quote", cascade="all, delete-orphan")
 
-
-class Part(Base):
-    """Individual part within a quote"""
-    __tablename__ = "parts"
+class Capability(Base):
+    __tablename__ = "capabilities"
     
     id = Column(Integer, primary_key=True, index=True)
-    name = Column(String(200), nullable=False)
-    part_number = Column(String(100))
-    quantity = Column(Integer, default=1)
+    name = Column(String, nullable=False)
+    category = Column(String, nullable=False)  # e.g., "Technology", "Domain", "Tool"
+    description = Column(Text)
+
+class Partner(Base):
+    __tablename__ = "partners"
     
-    # Dimensions and specifications
-    material = Column(String(100))
-    dimensions = Column(JSON)  # Store as JSON: {"length": 100, "width": 50, "height": 25}
-    tolerances = Column(JSON)  # Store tolerance data
-    surface_finish = Column(String(50))
-    heat_treatment = Column(String(100))
+    id = Column(Integer, primary_key=True, index=True)
+    user_id = Column(Integer, ForeignKey("users.id"), unique=True)
+    company_name = Column(String, nullable=False)
+    tier = Column(Enum(PartnerTier), nullable=False)
+    partner_type = Column(Enum(PartnerType), nullable=False)
+    website = Column(String)
+    description = Column(Text)
+    founded_year = Column(Integer)
+    employee_count = Column(Integer)
+    annual_revenue = Column(String)  # Range like "10M-50M"
     
-    # Complexity and classification
-    complexity = Column(SQLEnum(PartComplexity), default=PartComplexity.MEDIUM)
-    machining_processes = Column(JSON)  # List of required processes
+    # Contact Information
+    primary_contact_name = Column(String)
+    primary_contact_email = Column(String)
+    primary_contact_phone = Column(String)
     
-    # Cost breakdown
-    material_cost = Column(Float, default=0.0)
-    machining_cost = Column(Float, default=0.0)
-    setup_cost = Column(Float, default=0.0)
-    tooling_cost = Column(Float, default=0.0)
-    overhead_cost = Column(Float, default=0.0)
-    total_cost = Column(Float, default=0.0)
+    # Service Information
+    service_models = Column(JSON)  # List of ServiceModel enums
+    certifications = Column(JSON)  # List of certification names
+    compliance_info = Column(JSON)  # SOC2, ISO, etc.
     
-    # Time estimates
-    estimated_cycle_time = Column(Float, default=0.0)  # minutes
-    estimated_setup_time = Column(Float, default=0.0)  # minutes
-    actual_cycle_time = Column(Float)  # minutes - for feedback
-    actual_setup_time = Column(Float)  # minutes - for feedback
+    # Profile Status
+    profile_complete = Column(Boolean, default=False)
+    last_profile_update = Column(DateTime(timezone=True))
+    profile_version = Column(Integer, default=1)
     
-    # AI analysis results
-    ai_analysis = Column(JSON)  # Store AI analysis results
-    confidence_score = Column(Float, default=0.0)
-    
+    # Metadata
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     updated_at = Column(DateTime(timezone=True), onupdate=func.now())
     
     # Relationships
-    quote_id = Column(Integer, ForeignKey("quotes.id"))
-    quote = relationship("Quote", back_populates="parts")
-    analyses = relationship("PartAnalysis", back_populates="part", cascade="all, delete-orphan")
+    user = relationship("User", back_populates="partner")
+    regions = relationship("Region", secondary=partner_regions, back_populates="partners")
+    capabilities = relationship("Capability", secondary=partner_capabilities, back_populates="partners")
+    feedback_received = relationship("Feedback", back_populates="partner", foreign_keys="Feedback.partner_id")
+    case_studies = relationship("CaseStudy", back_populates="partner")
+    documents = relationship("Document", back_populates="partner")
 
-
-class QuoteFile(Base):
-    """Files associated with a quote (drawings, documents, etc.)"""
-    __tablename__ = "quote_files"
+class CaseStudy(Base):
+    __tablename__ = "case_studies"
     
     id = Column(Integer, primary_key=True, index=True)
-    filename = Column(String(255), nullable=False)
-    original_filename = Column(String(255), nullable=False)
-    file_path = Column(String(500), nullable=False)
-    file_size = Column(Integer, nullable=False)
-    file_type = Column(String(50), nullable=False)
-    mime_type = Column(String(100))
+    partner_id = Column(Integer, ForeignKey("partners.id"))
+    title = Column(String, nullable=False)
+    description = Column(Text)
+    industry = Column(String)
+    duration_months = Column(Integer)
+    team_size = Column(Integer)
+    technologies_used = Column(JSON)
+    outcomes = Column(Text)
+    client_name = Column(String)
+    is_public = Column(Boolean, default=True)
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+
+class Document(Base):
+    __tablename__ = "documents"
     
-    # File processing status
-    is_processed = Column(Boolean, default=False)
-    processing_status = Column(String(50), default="pending")  # pending, processing, completed, failed
-    processing_error = Column(Text)
-    
-    # Extracted metadata
-    extracted_data = Column(JSON)
-    
+    id = Column(Integer, primary_key=True, index=True)
+    partner_id = Column(Integer, ForeignKey("partners.id"))
+    filename = Column(String, nullable=False)
+    original_filename = Column(String, nullable=False)
+    file_path = Column(String, nullable=False)
+    file_size = Column(Integer)
+    file_type = Column(String)
+    document_type = Column(String)  # "case_study", "certification", "profile", etc.
     uploaded_at = Column(DateTime(timezone=True), server_default=func.now())
-    processed_at = Column(DateTime(timezone=True))
-    
-    # Relationships
-    quote_id = Column(Integer, ForeignKey("quotes.id"))
-    quote = relationship("Quote", back_populates="files")
 
-
-class PartAnalysis(Base):
-    """AI analysis results for parts"""
-    __tablename__ = "part_analyses"
+class Feedback(Base):
+    __tablename__ = "feedback"
     
     id = Column(Integer, primary_key=True, index=True)
-    analysis_type = Column(String(50), nullable=False)  # dimension_extraction, process_prediction, cost_estimation
+    partner_id = Column(Integer, ForeignKey("partners.id"))
+    reviewer_id = Column(Integer, ForeignKey("users.id"))
+    project_name = Column(String)
+    project_duration = Column(String)
     
-    # Analysis results
-    input_data = Column(JSON)
-    output_data = Column(JSON)
-    confidence_score = Column(Float, default=0.0)
-    processing_time = Column(Float, default=0.0)  # seconds
+    # Ratings (1-10 scale)
+    communication_rating = Column(Integer)
+    delivery_timeliness_rating = Column(Integer)
+    technical_competence_rating = Column(Integer)
+    cost_effectiveness_rating = Column(Integer)
+    cultural_fit_rating = Column(Integer)
+    overall_rating = Column(Integer)
     
-    # Model information
-    model_version = Column(String(50))
-    model_parameters = Column(JSON)
+    # Comments
+    strengths = Column(Text)
+    areas_for_improvement = Column(Text)
+    additional_comments = Column(Text)
     
-    # Feedback data
-    human_verified = Column(Boolean, default=False)
-    feedback_score = Column(Float)  # 1-5 rating
-    feedback_notes = Column(Text)
-    
-    created_at = Column(DateTime(timezone=True), server_default=func.now())
-    verified_at = Column(DateTime(timezone=True))
-    
-    # Relationships
-    part_id = Column(Integer, ForeignKey("parts.id"))
-    part = relationship("Part", back_populates="analyses")
-
-
-class SystemSettings(Base):
-    """System-wide settings and parameters"""
-    __tablename__ = "system_settings"
-    
-    id = Column(Integer, primary_key=True, index=True)
-    key = Column(String(100), unique=True, nullable=False)
-    value = Column(Text, nullable=False)
-    description = Column(Text)
-    category = Column(String(50), default="general")
-    is_public = Column(Boolean, default=False)  # Whether setting is visible to non-admin users
-    
+    # Metadata
+    is_anonymous = Column(Boolean, default=False)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     updated_at = Column(DateTime(timezone=True), onupdate=func.now())
-
-
-class AuditLog(Base):
-    """Audit log for tracking changes and actions"""
-    __tablename__ = "audit_logs"
-    
-    id = Column(Integer, primary_key=True, index=True)
-    user_id = Column(Integer, ForeignKey("users.id"))
-    action = Column(String(100), nullable=False)
-    resource_type = Column(String(50), nullable=False)
-    resource_id = Column(Integer)
-    changes = Column(JSON)
-    ip_address = Column(String(45))
-    user_agent = Column(Text)
-    
-    created_at = Column(DateTime(timezone=True), server_default=func.now())
     
     # Relationships
-    user = relationship("User")
+    partner = relationship("Partner", back_populates="feedback_received", foreign_keys=[partner_id])
+    reviewer = relationship("User", back_populates="feedback_given", foreign_keys=[reviewer_id])
+
+class Engagement(Base):
+    __tablename__ = "engagements"
+    
+    id = Column(Integer, primary_key=True, index=True)
+    partner_id = Column(Integer, ForeignKey("partners.id"))
+    buyer_id = Column(Integer, ForeignKey("users.id"))
+    project_name = Column(String, nullable=False)
+    project_type = Column(String)
+    start_date = Column(DateTime)
+    end_date = Column(DateTime)
+    status = Column(String)  # "active", "completed", "cancelled"
+    value = Column(Float)
+    currency = Column(String, default="USD")
+    description = Column(Text)
+    outcomes = Column(Text)
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+
+class Analytics(Base):
+    __tablename__ = "analytics"
+    
+    id = Column(Integer, primary_key=True, index=True)
+    metric_name = Column(String, nullable=False)
+    metric_value = Column(Float)
+    metric_data = Column(JSON)
+    date_recorded = Column(DateTime(timezone=True), server_default=func.now())
+    partner_id = Column(Integer, ForeignKey("partners.id"), nullable=True)
+    user_id = Column(Integer, ForeignKey("users.id"), nullable=True)
+
+# Add back_populates to complete relationships
+Region.partners = relationship("Partner", secondary=partner_regions, back_populates="regions")
+Capability.partners = relationship("Partner", secondary=partner_capabilities, back_populates="capabilities")
+Partner.case_studies = relationship("CaseStudy", back_populates="partner")
+Partner.documents = relationship("Document", back_populates="partner")
