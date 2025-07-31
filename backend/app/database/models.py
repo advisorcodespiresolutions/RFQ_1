@@ -2,258 +2,271 @@
 Database models for the RFQ platform
 """
 
-from sqlalchemy import (
-    Column, Integer, String, Float, DateTime, Boolean, Text, 
-    ForeignKey, JSON, Enum as SQLEnum
-)
+from sqlalchemy import Column, Integer, String, DateTime, Date, Time, Boolean, Text, Numeric, ForeignKey, JSON, Index
+from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import relationship
 from sqlalchemy.sql import func
 from datetime import datetime
-import enum
 
-from app.database.database import Base
-
-
-class QuoteStatus(str, enum.Enum):
-    """Quote status enumeration"""
-    PENDING = "pending"
-    IN_REVIEW = "in_review"
-    APPROVED = "approved"
-    REJECTED = "rejected"
-    SENT = "sent"
-    EXPIRED = "expired"
+Base = declarative_base()
 
 
-class PartComplexity(str, enum.Enum):
-    """Part complexity enumeration"""
-    LOW = "low"
-    MEDIUM = "medium"
-    HIGH = "high"
+class Employee(Base):
+    __tablename__ = "employees"
 
-
-class MachiningProcess(str, enum.Enum):
-    """Machining process enumeration"""
-    CNC_MILLING = "cnc_milling"
-    CNC_TURNING = "cnc_turning"
-    EDM = "edm"
-    GRINDING = "grinding"
-    DRILLING = "drilling"
-    LASER_CUTTING = "laser_cutting"
-    WATERJET = "waterjet"
-    MANUAL = "manual"
-
-
-class User(Base):
-    """User model"""
-    __tablename__ = "users"
-    
     id = Column(Integer, primary_key=True, index=True)
-    username = Column(String(50), unique=True, index=True, nullable=False)
-    email = Column(String(100), unique=True, index=True, nullable=False)
-    full_name = Column(String(100), nullable=False)
-    hashed_password = Column(String(255), nullable=False)
-    is_active = Column(Boolean, default=True)
-    is_admin = Column(Boolean, default=False)
-    role = Column(String(50), default="estimator")  # estimator, admin, client_viewer
-    created_at = Column(DateTime(timezone=True), server_default=func.now())
-    updated_at = Column(DateTime(timezone=True), onupdate=func.now())
-    
-    # Relationships
-    quotes = relationship("Quote", back_populates="created_by_user")
-
-
-class Client(Base):
-    """Client/Customer model"""
-    __tablename__ = "clients"
-    
-    id = Column(Integer, primary_key=True, index=True)
-    name = Column(String(200), nullable=False, index=True)
-    company = Column(String(200), nullable=False)
-    email = Column(String(100), nullable=False)
+    employee_id = Column(String(50), unique=True, index=True, nullable=False)
+    first_name = Column(String(100), nullable=False)
+    last_name = Column(String(100), nullable=False)
+    email = Column(String(255), unique=True, index=True, nullable=False)
     phone = Column(String(20))
-    address = Column(Text)
-    country = Column(String(50), default="US")
-    currency = Column(String(3), default="USD")
-    tax_rate = Column(Float, default=0.0)
+    hire_date = Column(Date, nullable=False)
+    status = Column(String(20), default="active", nullable=False)
+    hourly_rate = Column(Numeric(10, 2), nullable=False)
+    manager_id = Column(String(50), ForeignKey("employees.employee_id"))
+    department = Column(String(100))
+    location = Column(String(100))
+    geo_fence_enabled = Column(Boolean, default=False)
+    geo_fence_coordinates = Column(JSON)
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+    updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
+
+    # Relationships
+    time_entries = relationship("TimeEntry", back_populates="employee")
+    work_schedules = relationship("WorkSchedule", back_populates="employee")
+    timesheets = relationship("Timesheet", back_populates="employee")
+    managed_employees = relationship("Employee", backref="manager")
+
+    __table_args__ = (
+        Index('idx_employee_status', 'status'),
+        Index('idx_employee_department', 'department'),
+        Index('idx_employee_location', 'location'),
+    )
+
+
+class TimeEntry(Base):
+    __tablename__ = "time_entries"
+
+    id = Column(Integer, primary_key=True, index=True)
+    employee_id = Column(String(50), ForeignKey("employees.employee_id"), nullable=False)
+    punch_type = Column(String(20), nullable=False)  # clock_in, clock_out, break_start, break_end
+    punch_time = Column(DateTime(timezone=True), nullable=False)
+    location = Column(String(100))
+    latitude = Column(Numeric(10, 8))
+    longitude = Column(Numeric(11, 8))
+    device_type = Column(String(20))  # web, mobile, biometric
+    notes = Column(Text)
+    status = Column(String(20), default="pending", nullable=False)
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+    updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
+    adjusted_at = Column(DateTime(timezone=True))
+    adjustment_reason = Column(Text)
+    adjusted_by = Column(String(50))
+
+    # Relationships
+    employee = relationship("Employee", back_populates="time_entries")
+
+    __table_args__ = (
+        Index('idx_time_entry_employee_date', 'employee_id', 'punch_time'),
+        Index('idx_time_entry_punch_type', 'punch_type'),
+        Index('idx_time_entry_status', 'status'),
+        Index('idx_time_entry_device', 'device_type'),
+    )
+
+
+class WorkSchedule(Base):
+    __tablename__ = "work_schedules"
+
+    id = Column(Integer, primary_key=True, index=True)
+    employee_id = Column(String(50), ForeignKey("employees.employee_id"), nullable=False)
+    day_of_week = Column(Integer, nullable=False)  # 0=Monday, 6=Sunday
+    start_time = Column(Time, nullable=False)
+    end_time = Column(Time, nullable=False)
+    break_duration_minutes = Column(Integer, default=30)
     is_active = Column(Boolean, default=True)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
-    updated_at = Column(DateTime(timezone=True), onupdate=func.now())
-    
+    updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
+
     # Relationships
-    quotes = relationship("Quote", back_populates="client")
+    employee = relationship("Employee", back_populates="work_schedules")
+
+    __table_args__ = (
+        Index('idx_work_schedule_employee_day', 'employee_id', 'day_of_week'),
+        Index('idx_work_schedule_active', 'is_active'),
+    )
 
 
-class Quote(Base):
-    """Main quote model"""
-    __tablename__ = "quotes"
-    
+class OvertimeConfig(Base):
+    __tablename__ = "overtime_configs"
+
     id = Column(Integer, primary_key=True, index=True)
-    quote_number = Column(String(50), unique=True, index=True, nullable=False)
-    title = Column(String(200), nullable=False)
+    rule_name = Column(String(100), nullable=False)
+    rule_type = Column(String(50), nullable=False)  # daily_8_hours, daily_12_hours, weekly_7th_day, shift_16_hours
+    threshold_hours = Column(Numeric(5, 2), nullable=False)
+    multiplier = Column(Numeric(3, 2), nullable=False)
+    is_active = Column(Boolean, default=True)
     description = Column(Text)
-    
-    # Status and timing
-    status = Column(SQLEnum(QuoteStatus), default=QuoteStatus.PENDING)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
-    updated_at = Column(DateTime(timezone=True), onupdate=func.now())
-    expires_at = Column(DateTime(timezone=True))
+    updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
+
+    __table_args__ = (
+        Index('idx_overtime_config_type', 'rule_type'),
+        Index('idx_overtime_config_active', 'is_active'),
+    )
+
+
+class HolidayConfig(Base):
+    __tablename__ = "holiday_configs"
+
+    id = Column(Integer, primary_key=True, index=True)
+    holiday_name = Column(String(100), nullable=False)
+    holiday_type = Column(String(20), nullable=False)  # paid_holiday, unpaid_holiday, floating_holiday
+    date = Column(Date, nullable=False)
+    is_active = Column(Boolean, default=True)
+    description = Column(Text)
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+    updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
+
+    __table_args__ = (
+        Index('idx_holiday_config_date', 'date'),
+        Index('idx_holiday_config_type', 'holiday_type'),
+        Index('idx_holiday_config_active', 'is_active'),
+    )
+
+
+class Timesheet(Base):
+    __tablename__ = "timesheets"
+
+    id = Column(Integer, primary_key=True, index=True)
+    employee_id = Column(String(50), ForeignKey("employees.employee_id"), nullable=False)
+    week_start_date = Column(Date, nullable=False)
+    week_end_date = Column(Date, nullable=False)
+    total_hours = Column(Numeric(8, 2), default=0)
+    regular_hours = Column(Numeric(8, 2), default=0)
+    overtime_hours_1_5x = Column(Numeric(8, 2), default=0)
+    overtime_hours_2_0x = Column(Numeric(8, 2), default=0)
+    overtime_hours_1_6x = Column(Numeric(8, 2), default=0)
+    paid_holiday_hours = Column(Numeric(8, 2), default=0)
+    status = Column(String(20), default="pending", nullable=False)
+    notes = Column(Text)
+    approved_by = Column(String(50))
     approved_at = Column(DateTime(timezone=True))
-    
-    # Financial
-    total_cost = Column(Float, default=0.0)
-    total_quote_amount = Column(Float, default=0.0)
-    margin_percentage = Column(Float, default=20.0)
-    currency = Column(String(3), default="USD")
-    
-    # Processing
-    estimated_delivery_days = Column(Integer, default=14)
-    actual_delivery_days = Column(Integer)
-    ai_confidence_score = Column(Float, default=0.0)
-    
-    # Relationships
-    client_id = Column(Integer, ForeignKey("clients.id"))
-    created_by = Column(Integer, ForeignKey("users.id"))
-    
-    client = relationship("Client", back_populates="quotes")
-    created_by_user = relationship("User", back_populates="quotes")
-    parts = relationship("Part", back_populates="quote", cascade="all, delete-orphan")
-    files = relationship("QuoteFile", back_populates="quote", cascade="all, delete-orphan")
-
-
-class Part(Base):
-    """Individual part within a quote"""
-    __tablename__ = "parts"
-    
-    id = Column(Integer, primary_key=True, index=True)
-    name = Column(String(200), nullable=False)
-    part_number = Column(String(100))
-    quantity = Column(Integer, default=1)
-    
-    # Dimensions and specifications
-    material = Column(String(100))
-    dimensions = Column(JSON)  # Store as JSON: {"length": 100, "width": 50, "height": 25}
-    tolerances = Column(JSON)  # Store tolerance data
-    surface_finish = Column(String(50))
-    heat_treatment = Column(String(100))
-    
-    # Complexity and classification
-    complexity = Column(SQLEnum(PartComplexity), default=PartComplexity.MEDIUM)
-    machining_processes = Column(JSON)  # List of required processes
-    
-    # Cost breakdown
-    material_cost = Column(Float, default=0.0)
-    machining_cost = Column(Float, default=0.0)
-    setup_cost = Column(Float, default=0.0)
-    tooling_cost = Column(Float, default=0.0)
-    overhead_cost = Column(Float, default=0.0)
-    total_cost = Column(Float, default=0.0)
-    
-    # Time estimates
-    estimated_cycle_time = Column(Float, default=0.0)  # minutes
-    estimated_setup_time = Column(Float, default=0.0)  # minutes
-    actual_cycle_time = Column(Float)  # minutes - for feedback
-    actual_setup_time = Column(Float)  # minutes - for feedback
-    
-    # AI analysis results
-    ai_analysis = Column(JSON)  # Store AI analysis results
-    confidence_score = Column(Float, default=0.0)
-    
     created_at = Column(DateTime(timezone=True), server_default=func.now())
-    updated_at = Column(DateTime(timezone=True), onupdate=func.now())
-    
+    updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
+
     # Relationships
-    quote_id = Column(Integer, ForeignKey("quotes.id"))
-    quote = relationship("Quote", back_populates="parts")
-    analyses = relationship("PartAnalysis", back_populates="part", cascade="all, delete-orphan")
+    employee = relationship("Employee", back_populates="timesheets")
+
+    __table_args__ = (
+        Index('idx_timesheet_employee_week', 'employee_id', 'week_start_date'),
+        Index('idx_timesheet_status', 'status'),
+        Index('idx_timesheet_approved_by', 'approved_by'),
+    )
 
 
-class QuoteFile(Base):
-    """Files associated with a quote (drawings, documents, etc.)"""
-    __tablename__ = "quote_files"
-    
+class HolidayOverride(Base):
+    __tablename__ = "holiday_overrides"
+
     id = Column(Integer, primary_key=True, index=True)
-    filename = Column(String(255), nullable=False)
-    original_filename = Column(String(255), nullable=False)
-    file_path = Column(String(500), nullable=False)
-    file_size = Column(Integer, nullable=False)
-    file_type = Column(String(50), nullable=False)
-    mime_type = Column(String(100))
-    
-    # File processing status
-    is_processed = Column(Boolean, default=False)
-    processing_status = Column(String(50), default="pending")  # pending, processing, completed, failed
-    processing_error = Column(Text)
-    
-    # Extracted metadata
-    extracted_data = Column(JSON)
-    
-    uploaded_at = Column(DateTime(timezone=True), server_default=func.now())
-    processed_at = Column(DateTime(timezone=True))
-    
-    # Relationships
-    quote_id = Column(Integer, ForeignKey("quotes.id"))
-    quote = relationship("Quote", back_populates="files")
-
-
-class PartAnalysis(Base):
-    """AI analysis results for parts"""
-    __tablename__ = "part_analyses"
-    
-    id = Column(Integer, primary_key=True, index=True)
-    analysis_type = Column(String(50), nullable=False)  # dimension_extraction, process_prediction, cost_estimation
-    
-    # Analysis results
-    input_data = Column(JSON)
-    output_data = Column(JSON)
-    confidence_score = Column(Float, default=0.0)
-    processing_time = Column(Float, default=0.0)  # seconds
-    
-    # Model information
-    model_version = Column(String(50))
-    model_parameters = Column(JSON)
-    
-    # Feedback data
-    human_verified = Column(Boolean, default=False)
-    feedback_score = Column(Float)  # 1-5 rating
-    feedback_notes = Column(Text)
-    
+    employee_id = Column(String(50), ForeignKey("employees.employee_id"), nullable=False)
+    week_start_date = Column(Date, nullable=False)
+    holiday_hours = Column(Numeric(8, 2), nullable=False)
+    reason = Column(Text, nullable=False)
+    approved_by = Column(String(50), nullable=False)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
-    verified_at = Column(DateTime(timezone=True))
-    
-    # Relationships
-    part_id = Column(Integer, ForeignKey("parts.id"))
-    part = relationship("Part", back_populates="analyses")
 
-
-class SystemSettings(Base):
-    """System-wide settings and parameters"""
-    __tablename__ = "system_settings"
-    
-    id = Column(Integer, primary_key=True, index=True)
-    key = Column(String(100), unique=True, nullable=False)
-    value = Column(Text, nullable=False)
-    description = Column(Text)
-    category = Column(String(50), default="general")
-    is_public = Column(Boolean, default=False)  # Whether setting is visible to non-admin users
-    
-    created_at = Column(DateTime(timezone=True), server_default=func.now())
-    updated_at = Column(DateTime(timezone=True), onupdate=func.now())
+    __table_args__ = (
+        Index('idx_holiday_override_employee_week', 'employee_id', 'week_start_date'),
+        Index('idx_holiday_override_approved_by', 'approved_by'),
+    )
 
 
 class AuditLog(Base):
-    """Audit log for tracking changes and actions"""
     __tablename__ = "audit_logs"
-    
+
     id = Column(Integer, primary_key=True, index=True)
-    user_id = Column(Integer, ForeignKey("users.id"))
-    action = Column(String(100), nullable=False)
-    resource_type = Column(String(50), nullable=False)
-    resource_id = Column(Integer)
-    changes = Column(JSON)
+    table_name = Column(String(50), nullable=False)
+    record_id = Column(Integer, nullable=False)
+    action = Column(String(20), nullable=False)  # CREATE, UPDATE, DELETE, APPROVE, REJECT
+    old_values = Column(JSON)
+    new_values = Column(JSON)
+    user_id = Column(String(50), nullable=False)
     ip_address = Column(String(45))
     user_agent = Column(Text)
-    
     created_at = Column(DateTime(timezone=True), server_default=func.now())
-    
-    # Relationships
-    user = relationship("User")
+
+    __table_args__ = (
+        Index('idx_audit_log_table_record', 'table_name', 'record_id'),
+        Index('idx_audit_log_action', 'action'),
+        Index('idx_audit_log_user', 'user_id'),
+        Index('idx_audit_log_created', 'created_at'),
+    )
+
+
+class MissedPunchAlert(Base):
+    __tablename__ = "missed_punch_alerts"
+
+    id = Column(Integer, primary_key=True, index=True)
+    employee_id = Column(String(50), ForeignKey("employees.employee_id"), nullable=False)
+    alert_date = Column(Date, nullable=False)
+    alert_type = Column(String(20), nullable=False)  # clock_in, clock_out, break_start, break_end
+    expected_time = Column(Time, nullable=False)
+    actual_time = Column(Time)
+    grace_period_used = Column(Boolean, default=False)
+    resolved = Column(Boolean, default=False)
+    resolved_by = Column(String(50))
+    resolved_at = Column(DateTime(timezone=True))
+    notes = Column(Text)
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+
+    __table_args__ = (
+        Index('idx_missed_punch_employee_date', 'employee_id', 'alert_date'),
+        Index('idx_missed_punch_resolved', 'resolved'),
+        Index('idx_missed_punch_type', 'alert_type'),
+    )
+
+
+class OvertimeViolation(Base):
+    __tablename__ = "overtime_violations"
+
+    id = Column(Integer, primary_key=True, index=True)
+    employee_id = Column(String(50), ForeignKey("employees.employee_id"), nullable=False)
+    violation_date = Column(Date, nullable=False)
+    violation_type = Column(String(50), nullable=False)  # daily_8_hours, daily_12_hours, weekly_7th_day, shift_16_hours
+    hours_worked = Column(Numeric(8, 2), nullable=False)
+    threshold_hours = Column(Numeric(8, 2), nullable=False)
+    overtime_hours = Column(Numeric(8, 2), nullable=False)
+    multiplier_applied = Column(Numeric(3, 2), nullable=False)
+    resolved = Column(Boolean, default=False)
+    resolved_by = Column(String(50))
+    resolved_at = Column(DateTime(timezone=True))
+    notes = Column(Text)
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+
+    __table_args__ = (
+        Index('idx_overtime_violation_employee_date', 'employee_id', 'violation_date'),
+        Index('idx_overtime_violation_type', 'violation_type'),
+        Index('idx_overtime_violation_resolved', 'resolved'),
+    )
+
+
+class PayrollExport(Base):
+    __tablename__ = "payroll_exports"
+
+    id = Column(Integer, primary_key=True, index=True)
+    export_date = Column(Date, nullable=False)
+    pay_period_start = Column(Date, nullable=False)
+    pay_period_end = Column(Date, nullable=False)
+    export_format = Column(String(10), nullable=False)  # CSV, XML, JSON
+    file_path = Column(String(255))
+    total_employees = Column(Integer, default=0)
+    total_hours = Column(Numeric(10, 2), default=0)
+    total_pay = Column(Numeric(12, 2), default=0)
+    exported_by = Column(String(50), nullable=False)
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+
+    __table_args__ = (
+        Index('idx_payroll_export_date', 'export_date'),
+        Index('idx_payroll_export_period', 'pay_period_start', 'pay_period_end'),
+        Index('idx_payroll_export_format', 'export_format'),
+    )
