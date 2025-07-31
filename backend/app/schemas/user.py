@@ -1,0 +1,41 @@
+from pydantic import BaseModel, EmailStr
+from typing import Optional
+from datetime import datetime
+from app.database.models import UserRole
+
+class UserBase(BaseModel):
+    email: EmailStr
+    first_name: str
+    last_name: str
+    role: UserRole
+
+class UserCreate(UserBase):
+    password: str
+
+class UserUpdate(BaseModel):
+    email: Optional[EmailStr] = None
+    first_name: Optional[str] = None
+    last_name: Optional[str] = None
+    role: Optional[UserRole] = None
+    is_active: Optional[bool] = None
+
+class User(UserBase):
+    id: int
+    is_active: bool
+    created_at: datetime
+    updated_at: Optional[datetime] = None
+
+    class Config:
+        from_attributes = True
+
+class UserLogin(BaseModel):
+    email: EmailStr
+    password: str
+
+class Token(BaseModel):
+    access_token: str
+    token_type: str
+    user: User
+
+class TokenData(BaseModel):
+    user_id: Optional[str] = None

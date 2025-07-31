@@ -2,31 +2,41 @@
 Manufacturing RFQ Intelligence Platform - Main FastAPI Application
 """
 
-from fastapi import FastAPI, Request
+from fastapi import FastAPI, Depends, HTTPException, status
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import JSONResponse
-from fastapi.staticfiles import StaticFiles
+from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
+from contextlib import asynccontextmanager
 import uvicorn
-import os
-from pathlib import Path
+from typing import List, Optional
+import logging
 
 from app.core.config import settings
-from app.api.api_v1.api import api_router
-from app.database.database import engine
-from app.database import models
+from app.core.auth import get_current_user, verify_token
+from app.database.database import init_db
+from app.api import partners, vendors, feedback, analytics, auth, admin
 
-# Create database tables
-models.Base.metadata.create_all(bind=engine)
+# Configure logging
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
 
-# Initialize FastAPI app
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    # Startup
+    logger.info("Starting Bayer IT Partner Ecosystem Portal...")
+    await init_db()
+    logger.info("Database initialized successfully")
+    yield
+    # Shutdown
+    logger.info("Shutting down Bayer IT Partner Ecosystem Portal...")
+
 app = FastAPI(
-    title="Manufacturing RFQ Intelligence Platform",
-    description="AI-powered RFQ workflow management system",
+    title="Bayer IT Partner Ecosystem Portal",
+    description="A secure platform for managing IT vendor partnerships, feedback, and analytics",
     version="1.0.0",
-    openapi_url=f"{settings.API_V1_STR}/openapi.json"
+    lifespan=lifespan
 )
 
-# Configure CORS
+# CORS middleware
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["http://localhost:3000", "http://localhost:3001"],
@@ -35,51 +45,33 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# Create uploads directory if it doesn't exist
-uploads_dir = Path("uploads")
-uploads_dir.mkdir(exist_ok=True)
+# Security
+security = HTTPBearer()
 
-# Mount static files
-app.mount("/uploads", StaticFiles(directory="uploads"), name="uploads")
-
-# Include API routes
-app.include_router(api_router, prefix=settings.API_V1_STR)
-
+# Include API routers
+app.include_router(auth.router, prefix="/api/auth", tags=["Authentication"])
+app.include_router(partners.router, prefix="/api/partners", tags=["Partners"])
+app.include_router(vendors.router, prefix="/api/vendors", tags=["Vendors"])
+app.include_router(feedback.router, prefix="/api/feedback", tags=["Feedback"])
+app.include_router(analytics.router, prefix="/api/analytics", tags=["Analytics"])
+app.include_router(admin.router, prefix="/api/admin", tags=["Admin"])
 
 @app.get("/")
 async def root():
-    """Root endpoint with API information"""
     return {
-        "message": "Manufacturing RFQ Intelligence Platform API",
+        "message": "Bayer IT Partner Ecosystem Portal API",
         "version": "1.0.0",
-        "docs_url": "/docs",
-        "health_check": "/health"
+        "status": "operational"
     }
-
 
 @app.get("/health")
 async def health_check():
-    """Health check endpoint"""
-    return {"status": "healthy", "service": "rfq-platform-api"}
-
-
-@app.exception_handler(Exception)
-async def global_exception_handler(request: Request, exc: Exception):
-    """Global exception handler"""
-    return JSONResponse(
-        status_code=500,
-        content={
-            "message": "Internal server error",
-            "detail": str(exc) if settings.DEBUG else "An unexpected error occurred"
-        }
-    )
-
+    return {"status": "healthy", "service": "partner-ecosystem-api"}
 
 if __name__ == "__main__":
     uvicorn.run(
-        "app.main:app",
+        "main:app",
         host="0.0.0.0",
         port=8000,
-        reload=True,
-        log_level="info"
+        reload=True
     )

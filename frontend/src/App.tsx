@@ -1,158 +1,135 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
-import { QueryClient, QueryClientProvider } from 'react-query';
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { Toaster } from 'react-hot-toast';
 
-// Layout
+// Components
 import Layout from './components/Layout/Layout';
-
-// Pages
-import Dashboard from './pages/Dashboard';
-import QuotesList from './pages/Quotes/QuotesList';
-import QuoteDetail from './pages/Quotes/QuoteDetail';
-import CreateQuote from './pages/Quotes/CreateQuote';
-import FileUpload from './pages/Files/FileUpload';
-import Analytics from './pages/Analytics';
-import Settings from './pages/Settings';
 import Login from './pages/Auth/Login';
+import Dashboard from './pages/Dashboard/Dashboard';
+import Partners from './pages/Partners/Partners';
+import PartnerDetail from './pages/Partners/PartnerDetail';
+import Feedback from './pages/Feedback/Feedback';
+import Analytics from './pages/Analytics/Analytics';
+import Admin from './pages/Admin/Admin';
+import VendorProfile from './pages/Vendor/VendorProfile';
+import VendorDocuments from './pages/Vendor/VendorDocuments';
 
-// Contexts
-import { AuthProvider } from './contexts/AuthContext';
-import { useAuth } from './contexts/AuthContext';
+// Context
+import { AuthProvider, useAuth } from './contexts/AuthContext';
+
+// Types
+import { UserRole } from './types/auth';
 
 // Styles
-import './index.css';
+import './App.css';
 
-// Create a client
 const queryClient = new QueryClient({
   defaultOptions: {
     queries: {
-      refetchOnWindowFocus: false,
       retry: 1,
-      staleTime: 5 * 60 * 1000, // 5 minutes
+      refetchOnWindowFocus: false,
     },
   },
 });
 
 // Protected Route Component
-const ProtectedRoute: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  const { isAuthenticated, loading } = useAuth();
+const ProtectedRoute: React.FC<{ 
+  children: React.ReactNode; 
+  allowedRoles?: UserRole[];
+}> = ({ children, allowedRoles }) => {
+  const { user, isLoading } = useAuth();
 
-  if (loading) {
+  if (isLoading) {
     return (
       <div className="min-h-screen flex items-center justify-center">
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary-600"></div>
+        <div className="animate-spin rounded-full h-32 w-32 border-b-2 border-blue-600"></div>
       </div>
     );
   }
 
-  if (!isAuthenticated) {
+  if (!user) {
     return <Navigate to="/login" replace />;
   }
 
-  return <Layout>{children}</Layout>;
+  if (allowedRoles && !allowedRoles.includes(user.role)) {
+    return <Navigate to="/dashboard" replace />;
+  }
+
+  return <>{children}</>;
 };
 
 // Main App Component
 const AppContent: React.FC = () => {
-  const { isAuthenticated } = useAuth();
+  const { user } = useAuth();
+
+  if (!user) {
+    return (
+      <Router>
+        <Routes>
+          <Route path="/login" element={<Login />} />
+          <Route path="*" element={<Navigate to="/login" replace />} />
+        </Routes>
+      </Router>
+    );
+  }
 
   return (
     <Router>
-      <Routes>
-        {/* Public Routes */}
-        <Route 
-          path="/login" 
-          element={
-            isAuthenticated ? <Navigate to="/dashboard" replace /> : <Login />
-          } 
-        />
-
-        {/* Protected Routes */}
-        <Route
-          path="/dashboard"
-          element={
+      <Layout>
+        <Routes>
+          <Route path="/dashboard" element={
             <ProtectedRoute>
               <Dashboard />
             </ProtectedRoute>
-          }
-        />
-        
-        <Route
-          path="/quotes"
-          element={
-            <ProtectedRoute>
-              <QuotesList />
+          } />
+          
+          <Route path="/partners" element={
+            <ProtectedRoute allowedRoles={[UserRole.ADMIN, UserRole.IT_MANAGER]}>
+              <Partners />
             </ProtectedRoute>
-          }
-        />
-        
-        <Route
-          path="/quotes/new"
-          element={
-            <ProtectedRoute>
-              <CreateQuote />
+          } />
+          
+          <Route path="/partners/:id" element={
+            <ProtectedRoute allowedRoles={[UserRole.ADMIN, UserRole.IT_MANAGER]}>
+              <PartnerDetail />
             </ProtectedRoute>
-          }
-        />
-        
-        <Route
-          path="/quotes/:id"
-          element={
-            <ProtectedRoute>
-              <QuoteDetail />
+          } />
+          
+          <Route path="/feedback" element={
+            <ProtectedRoute allowedRoles={[UserRole.ADMIN, UserRole.IT_MANAGER]}>
+              <Feedback />
             </ProtectedRoute>
-          }
-        />
-        
-        <Route
-          path="/files/upload"
-          element={
-            <ProtectedRoute>
-              <FileUpload />
-            </ProtectedRoute>
-          }
-        />
-        
-        <Route
-          path="/analytics"
-          element={
-            <ProtectedRoute>
+          } />
+          
+          <Route path="/analytics" element={
+            <ProtectedRoute allowedRoles={[UserRole.ADMIN, UserRole.IT_MANAGER]}>
               <Analytics />
             </ProtectedRoute>
-          }
-        />
-        
-        <Route
-          path="/settings"
-          element={
-            <ProtectedRoute>
-              <Settings />
+          } />
+          
+          <Route path="/admin" element={
+            <ProtectedRoute allowedRoles={[UserRole.ADMIN, UserRole.SUPER_ADMIN]}>
+              <Admin />
             </ProtectedRoute>
-          }
-        />
-
-        {/* Default Route */}
-        <Route 
-          path="/" 
-          element={<Navigate to="/dashboard" replace />} 
-        />
-        
-        {/* Catch all route */}
-        <Route 
-          path="*" 
-          element={
-            <ProtectedRoute>
-              <div className="min-h-screen flex items-center justify-center">
-                <div className="text-center">
-                  <h1 className="text-4xl font-bold text-gray-900 mb-4">404</h1>
-                  <p className="text-gray-600">Page not found</p>
-                </div>
-              </div>
+          } />
+          
+          <Route path="/vendor/profile" element={
+            <ProtectedRoute allowedRoles={[UserRole.VENDOR]}>
+              <VendorProfile />
             </ProtectedRoute>
-          } 
-        />
-      </Routes>
+          } />
+          
+          <Route path="/vendor/documents" element={
+            <ProtectedRoute allowedRoles={[UserRole.VENDOR]}>
+              <VendorDocuments />
+            </ProtectedRoute>
+          } />
+          
+          <Route path="/" element={<Navigate to="/dashboard" replace />} />
+          <Route path="*" element={<Navigate to="/dashboard" replace />} />
+        </Routes>
+      </Layout>
     </Router>
   );
 };
@@ -172,14 +149,16 @@ const App: React.FC = () => {
             },
             success: {
               duration: 3000,
-              style: {
-                background: '#22c55e',
+              iconTheme: {
+                primary: '#10B981',
+                secondary: '#fff',
               },
             },
             error: {
               duration: 5000,
-              style: {
-                background: '#ef4444',
+              iconTheme: {
+                primary: '#EF4444',
+                secondary: '#fff',
               },
             },
           }}
