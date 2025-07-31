@@ -1,32 +1,34 @@
-# Manufacturing RFQ Intelligence Platform
+# Time & Attendance System - California Retail
 
-A smart, AI-powered application for managing RFQ (Request for Quotation) workflows, from part drawing ingestion to final quote generation, equipped with end-to-end visibility, prediction models, and automation.
+A comprehensive workforce management solution for retail contingent workers in California, featuring automated time tracking, California-compliant overtime calculations, paid holiday management, and full compliance reporting.
 
 ## 🎯 Features
 
-- **AI-Powered Drawing Analysis**: Extract dimensions, tolerances, and machining features from 2D/3D CAD drawings
-- **Smart Cost Prediction**: ML models for cycle time and cost estimation
-- **Quote Management**: End-to-end quote generation and approval workflow  
-- **Analytics Dashboard**: Real-time KPIs, pipeline tracking, and performance metrics
-- **Feedback Loop**: Continuous learning from actual vs predicted results
+- **Multi-Modal Time Tracking**: Web punch, mobile app (geo-fenced), biometric terminals
+- **California Overtime Compliance**: Daily overtime (8h/12h rules), 7th consecutive day, 16+ hour shifts
+- **Paid Holiday Management**: Automatic allocation with admin override capabilities
+- **Compliance Reporting**: California Labor Code §510, §554, AB 1522 compliance
+- **Manager Dashboard**: Timesheet approval, exception alerts, overtime monitoring
+- **Audit Trail**: 4-year retention with full change tracking
 
 ## 🛠 Tech Stack
 
-- **Backend**: FastAPI + PostgreSQL
-- **Frontend**: React + TailwindCSS + Chart.js
-- **AI/ML**: PyTorch + OpenCV + scikit-learn
-- **File Processing**: OpenCascade for 3D, pdf2image, Tesseract
+- **Backend**: FastAPI + PostgreSQL + Redis
+- **Frontend**: React + TypeScript + TailwindCSS
+- **Mobile**: React Native with geofencing
+- **Compliance**: California Labor Code integration
 - **Deployment**: Docker + containerized services
 
 ## 📁 Project Structure
 
 ```
 /
-├── backend/          # FastAPI backend
-├── frontend/         # React frontend
-├── ai_models/        # ML models and training
+├── backend/          # FastAPI backend with compliance engine
+├── frontend/         # React web application
+├── mobile/           # React Native mobile app
+├── compliance/       # California labor law compliance engine
 ├── docker/          # Docker configurations
-└── docs/            # Documentation
+└── docs/            # Documentation and compliance guides
 ```
 
 ## 🚀 Getting Started
@@ -36,10 +38,11 @@ A smart, AI-powered application for managing RFQ (Request for Quotation) workflo
 3. Run with Docker: `docker-compose up`
 4. Access the application at `http://localhost:3000`
 
-## 📊 Key Metrics
+## 📊 Key Features
 
-- Quote processing time: ~3.2 minutes
-- AI prediction accuracy: 94.8%
-- Supported file formats: DWG, STEP, IGES, PDF, PNG, JPG
-- Multi-language quote generation
-- Real-time currency conversion
+- **Work Schedule**: 4 days/week, 8 hours minimum per shift
+- **Grace Period**: 5-minute clock-in/out window
+- **Overtime Rules**: California daily overtime + 16+ hour special rule
+- **Holiday Allocation**: 1 paid holiday/week for 4+ shifts
+- **Compliance**: Full California Labor Code adherence
+- **Audit Trail**: 4-year retention with approval workflows

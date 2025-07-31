@@ -2,191 +2,105 @@ import React from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 import { QueryClient, QueryClientProvider } from 'react-query';
 import { Toaster } from 'react-hot-toast';
+import TimeClock from './components/TimeClock';
+import ManagerDashboard from './components/ManagerDashboard';
+import './App.css';
 
-// Layout
-import Layout from './components/Layout/Layout';
+const queryClient = new QueryClient();
 
-// Pages
-import Dashboard from './pages/Dashboard';
-import QuotesList from './pages/Quotes/QuotesList';
-import QuoteDetail from './pages/Quotes/QuoteDetail';
-import CreateQuote from './pages/Quotes/CreateQuote';
-import FileUpload from './pages/Files/FileUpload';
-import Analytics from './pages/Analytics';
-import Settings from './pages/Settings';
-import Login from './pages/Auth/Login';
-
-// Contexts
-import { AuthProvider } from './contexts/AuthContext';
-import { useAuth } from './contexts/AuthContext';
-
-// Styles
-import './index.css';
-
-// Create a client
-const queryClient = new QueryClient({
-  defaultOptions: {
-    queries: {
-      refetchOnWindowFocus: false,
-      retry: 1,
-      staleTime: 5 * 60 * 1000, // 5 minutes
-    },
-  },
-});
-
-// Protected Route Component
-const ProtectedRoute: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  const { isAuthenticated, loading } = useAuth();
-
-  if (loading) {
-    return (
-      <div className="min-h-screen flex items-center justify-center">
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary-600"></div>
-      </div>
-    );
-  }
-
-  if (!isAuthenticated) {
-    return <Navigate to="/login" replace />;
-  }
-
-  return <Layout>{children}</Layout>;
-};
-
-// Main App Component
-const AppContent: React.FC = () => {
-  const { isAuthenticated } = useAuth();
-
-  return (
-    <Router>
-      <Routes>
-        {/* Public Routes */}
-        <Route 
-          path="/login" 
-          element={
-            isAuthenticated ? <Navigate to="/dashboard" replace /> : <Login />
-          } 
-        />
-
-        {/* Protected Routes */}
-        <Route
-          path="/dashboard"
-          element={
-            <ProtectedRoute>
-              <Dashboard />
-            </ProtectedRoute>
-          }
-        />
-        
-        <Route
-          path="/quotes"
-          element={
-            <ProtectedRoute>
-              <QuotesList />
-            </ProtectedRoute>
-          }
-        />
-        
-        <Route
-          path="/quotes/new"
-          element={
-            <ProtectedRoute>
-              <CreateQuote />
-            </ProtectedRoute>
-          }
-        />
-        
-        <Route
-          path="/quotes/:id"
-          element={
-            <ProtectedRoute>
-              <QuoteDetail />
-            </ProtectedRoute>
-          }
-        />
-        
-        <Route
-          path="/files/upload"
-          element={
-            <ProtectedRoute>
-              <FileUpload />
-            </ProtectedRoute>
-          }
-        />
-        
-        <Route
-          path="/analytics"
-          element={
-            <ProtectedRoute>
-              <Analytics />
-            </ProtectedRoute>
-          }
-        />
-        
-        <Route
-          path="/settings"
-          element={
-            <ProtectedRoute>
-              <Settings />
-            </ProtectedRoute>
-          }
-        />
-
-        {/* Default Route */}
-        <Route 
-          path="/" 
-          element={<Navigate to="/dashboard" replace />} 
-        />
-        
-        {/* Catch all route */}
-        <Route 
-          path="*" 
-          element={
-            <ProtectedRoute>
-              <div className="min-h-screen flex items-center justify-center">
-                <div className="text-center">
-                  <h1 className="text-4xl font-bold text-gray-900 mb-4">404</h1>
-                  <p className="text-gray-600">Page not found</p>
-                </div>
-              </div>
-            </ProtectedRoute>
-          } 
-        />
-      </Routes>
-    </Router>
-  );
-};
-
-const App: React.FC = () => {
+function App() {
   return (
     <QueryClientProvider client={queryClient}>
-      <AuthProvider>
-        <AppContent />
-        <Toaster
-          position="top-right"
-          toastOptions={{
-            duration: 4000,
-            style: {
-              background: '#363636',
-              color: '#fff',
-            },
-            success: {
-              duration: 3000,
-              style: {
-                background: '#22c55e',
-              },
-            },
-            error: {
-              duration: 5000,
-              style: {
-                background: '#ef4444',
-              },
-            },
-          }}
-        />
-      </AuthProvider>
+      <Router>
+        <div className="min-h-screen bg-gray-50">
+          <Toaster position="top-right" />
+          
+          {/* Header */}
+          <header className="bg-white shadow-sm border-b">
+            <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+              <div className="flex justify-between items-center py-4">
+                <div className="flex items-center">
+                  <h1 className="text-xl font-semibold text-gray-900">
+                    Time & Attendance System
+                  </h1>
+                  <span className="ml-2 px-2 py-1 text-xs bg-blue-100 text-blue-800 rounded-full">
+                    California Retail
+                  </span>
+                </div>
+                <div className="flex items-center space-x-4">
+                  <span className="text-sm text-gray-500">
+                    California Labor Code Compliant
+                  </span>
+                </div>
+              </div>
+            </div>
+          </header>
+
+          {/* Main Content */}
+          <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+            <Routes>
+              <Route path="/" element={<Navigate to="/time-clock" replace />} />
+              <Route 
+                path="/time-clock" 
+                element={
+                  <div className="max-w-4xl mx-auto">
+                    <div className="text-center mb-8">
+                      <h2 className="text-3xl font-bold text-gray-900 mb-2">
+                        Employee Time Clock
+                      </h2>
+                      <p className="text-gray-600">
+                        Clock in and out with California compliance tracking
+                      </p>
+                    </div>
+                    <TimeClock 
+                      employeeId={1}
+                      employeeName="John Doe"
+                      locationName="Downtown Store"
+                    />
+                  </div>
+                } 
+              />
+              <Route 
+                path="/manager" 
+                element={
+                  <ManagerDashboard managerId={1} />
+                } 
+              />
+              <Route 
+                path="/reports" 
+                element={
+                  <div className="bg-white rounded-lg shadow p-6">
+                    <h2 className="text-2xl font-bold text-gray-900 mb-4">
+                      Reports & Analytics
+                    </h2>
+                    <p className="text-gray-600">
+                      Comprehensive reporting and compliance analytics coming soon...
+                    </p>
+                  </div>
+                } 
+              />
+            </Routes>
+          </main>
+
+          {/* Footer */}
+          <footer className="bg-white border-t mt-12">
+            <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
+              <div className="flex justify-between items-center">
+                <div className="text-sm text-gray-500">
+                  © 2024 Time & Attendance System. California Labor Code Compliant.
+                </div>
+                <div className="flex space-x-6 text-sm text-gray-500">
+                  <span>§510 Compliance</span>
+                  <span>§554 Compliance</span>
+                  <span>AB 1522 Compliance</span>
+                </div>
+              </div>
+            </div>
+          </footer>
+        </div>
+      </Router>
     </QueryClientProvider>
   );
-};
+}
 
 export default App;
